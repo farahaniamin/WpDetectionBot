@@ -180,10 +180,18 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
   // Category selection
   bot.callbackQuery(/^plugin:category:(.+)$/, async (ctx: MyContext) => {
     const categorySlug = ctx.match?.[1];
-    if (!categorySlug) return;
+    console.log('[plugin_category] Selected category:', categorySlug);
+
+    if (!categorySlug) {
+      console.log('[plugin_category] No category slug found');
+      return;
+    }
 
     const category = PLUGIN_CATEGORIES.find((c) => c.slug === categorySlug);
-    if (!category) return;
+    if (!category) {
+      console.log('[plugin_category] Category not found:', categorySlug);
+      return;
+    }
 
     ctx.session.selectedCategory = categorySlug;
     ctx.session.pluginPage = 1;
@@ -191,12 +199,14 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
     await ctx.answerCallbackQuery({ text: '⏳ در حال بارگذاری...' });
 
     try {
+      console.log('[plugin_category] Fetching items for category:', categorySlug);
       const data = await listItems({
         type: 'plugin',
         category: categorySlug,
         page: 1,
         limit: 10
       });
+      console.log('[plugin_category] Found', data.items.length, 'items');
 
       if (data.items.length === 0) {
         await ctx.editMessageText(
@@ -222,8 +232,17 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
           reply_markup: pluginListKeyboard(data.items, 1)
         }
       );
-    } catch (e) {
+    } catch (e: any) {
       console.error('[plugin_category] Error:', e);
+      const errorMsg = e?.message || 'Unknown error';
+      await ctx.editMessageText(
+        '━━━━━━━━━━━━━━\n❌ <b>خطا در بارگذاری</b>\n━━━━━━━━━━━━━━\n\n' +
+          'خطا: ' +
+          errorMsg +
+          '\n\n' +
+          'لطفاً دوباره تلاش کنید.',
+        { parse_mode: 'HTML', reply_markup: pluginCategoryKeyboard(PLUGIN_CATEGORIES) }
+      );
       await ctx.answerCallbackQuery({ text: '❌ خطا در دریافت لیست' });
     }
   });

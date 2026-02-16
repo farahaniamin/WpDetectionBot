@@ -67,11 +67,25 @@ export async function listItems(filters?: {
   const queryString = params.toString();
   const url = `${API_URL}/items${queryString ? '?' + queryString : ''}`;
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch items: ${response.status}`);
+  console.log('[pluginyabApi] Fetching items from:', url);
+
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    });
+    console.log('[pluginyabApi] Items response status:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch items: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[pluginyabApi] Items response data:', data);
+    return data;
+  } catch (e: any) {
+    console.error('[pluginyabApi] Failed to fetch items:', e?.message || e);
+    throw e;
   }
-  return response.json();
 }
 
 export async function getItem(id: number): Promise<PluginyabItem> {
