@@ -122,18 +122,18 @@ export async function downloadFile(id: number): Promise<{ buffer: Buffer; filena
 
 // Static categories list for faster UI - Matching Pluginyab database
 export const PLUGIN_CATEGORIES = [
-  { slug: 'کاربردی', name: '🔧 کاربردی' },
-  { slug: 'افزودنی المنتور', name: '✨ افزودنی المنتور' },
-  { slug: 'فرم ساز', name: '📝 فرم ساز' },
-  { slug: 'امنیتی', name: '🔒 امنیتی' },
-  { slug: 'فروشگاهی', name: '🛒 فروشگاهی' },
-  { slug: 'سئو', name: '📈 سئو' },
-  { slug: 'پروفایل', name: '👤 پروفایل' },
-  { slug: 'چند زبانه', name: '🌐 چند زبانه' },
-  { slug: 'پشتیبان گیر', name: '💾 پشتیبان گیر' },
-  { slug: 'صفحه ساز', name: '🎨 صفحه ساز' },
-  { slug: 'همه افزونه ها', name: '🔌 همه افزونه‌ها' },
-  { slug: 'اسلایدر', name: '🖼️ اسلایدر' }
+  { slug: 'public-plugins', name: '🔧 کاربردی', count: 19 },
+  { slug: 'elementor-addon', name: '✨ افزودنی المنتور', count: 24 },
+  { slug: 'forms-plugins', name: '📝 فرم ساز', count: 11 },
+  { slug: 'security-plugins', name: '🔒 امنیتی', count: 11 },
+  { slug: 'ecommerce-plugins', name: '🛒 فروشگاهی', count: 10 },
+  { slug: 'seo-plugins', name: '📈 سئو', count: 9 },
+  { slug: 'user-profile-registration-plugins', name: '👤 پروفایل', count: 7 },
+  { slug: 'multi-languages-plugins', name: '🌐 چند زبانه', count: 6 },
+  { slug: 'backup-plugins', name: '💾 پشتیبان گیر', count: 6 },
+  { slug: 'theme-builder-plugin', name: '🎨 صفحه ساز', count: 6 },
+  { slug: 'slider-plugins', name: '🖼️ اسلایدر', count: 5 },
+  { slug: 'download-wordpress-plugins', name: '🔌 همه افزونه‌ها', count: 11 }
 ];
 
 export async function searchPlugins(query: string): Promise<PluginyabItem[]> {
