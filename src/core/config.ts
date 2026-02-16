@@ -54,7 +54,9 @@ const schema = z.object({
 
   SEO_AUDIT_API_URL: z.string().url().default('http://localhost:8787'),
   SEO_AUDIT_TIMEOUT_MS: z.coerce.number().int().min(60000).max(600000).default(300000),
-  SEO_AUDIT_POLL_INTERVAL_MS: z.coerce.number().int().min(1000).max(10000).default(2000)
+  SEO_AUDIT_POLL_INTERVAL_MS: z.coerce.number().int().min(1000).max(10000).default(2000),
+
+  PLUGINYAB_API_URL: z.string().url().default('http://localhost:3001')
 });
 
 export type AppConfig = z.infer<typeof schema> & { ADMIN_USER_ID_SET: Set<number> };

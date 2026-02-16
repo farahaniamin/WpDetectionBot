@@ -1,4 +1,4 @@
-import type { Bot } from 'grammy';
+import { Bot, InputFile } from 'grammy';
 import type { Db } from '../../db/db.js';
 import type { AppConfig } from '../../core/config.js';
 import type { MyContext } from '../context.js';
@@ -7,7 +7,11 @@ import {
   cancelKeyboard,
   mainMenuKeyboard,
   siteListKeyboard,
-  watchManageKeyboard
+  watchManageKeyboard,
+  pluginCategoryKeyboard,
+  pluginListKeyboard,
+  pluginDetailKeyboard,
+  pluginSearchKeyboard
 } from '../../ui/keyboards.js';
 import { renderMenuText } from './settings.js';
 import { queryRecentVulns, insertEvent, listWatches, deleteWatch } from '../../db/repos.js';
@@ -31,6 +35,14 @@ import {
   formatSeoError
 } from '../../ui/formatters/seoReportFormatter.js';
 import { seoProgressKeyboard, seoReportKeyboard } from '../../ui/keyboards.js';
+import {
+  getHealth,
+  listItems,
+  getItem,
+  downloadFile,
+  searchPlugins,
+  PLUGIN_CATEGORIES
+} from '../../services/pluginyabApi.js';
 
 function cleanSiteName(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\.+$/, '');
@@ -98,6 +110,284 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
       }
     );
     await ctx.answerCallbackQuery();
+  });
+
+  // Plugin Download Flow
+  bot.callbackQuery(MENU.PLUGIN_DOWNLOAD, async (ctx: MyContext) => {
+    ctx.session.flow = 'plugin:browse';
+    ctx.session.pluginPage = 1;
+    ctx.session.selectedCategory = undefined;
+
+    try {
+      // Check service health
+      const health = await getHealth();
+      if (health.status !== 'ok') {
+        await ctx.editMessageText(
+          '━━━━━━━━━━━━━━\n❌ <b>سرویس دانلود در دسترس نیست</b>\n━━━━━━━━━━━━━━\n\n' +
+            'لطفاً بعداً تلاش کنید.',
+          { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() }
+        );
+        await ctx.answerCallbackQuery({ text: '❌ سرویس در دسترس نیست' });
+        return;
+      }
+
+      await ctx.editMessageText(
+        '━━━━━━━━━━━━━━\n📦 <b>دانلود افزونه</b>\n━━━━━━━━━━━━━━\n\n' +
+          'تعداد افزونه‌های موجود: ' +
+          health.items +
+          '\n\n' +
+          'دسته‌بندی مورد نظر را انتخاب کنید:',
+        {
+          parse_mode: 'HTML',
+          reply_markup: pluginCategoryKeyboard(PLUGIN_CATEGORIES)
+        }
+      );
+      await ctx.answerCallbackQuery();
+    } catch (e) {
+      console.error('[plugin_download] Health check error:', e);
+      await ctx.editMessageText(
+        '━━━━━━━━━━━━━━\n❌ <b>خطا در اتصال به سرویس</b>\n━━━━━━━━━━━━━━\n\n' +
+          'لطفاً بررسی کنید که سرویس Pluginyab روی پورت 3001 در حال اجراست.',
+        { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() }
+      );
+      await ctx.answerCallbackQuery({ text: '❌ خطا در اتصال' });
+    }
+  });
+
+  // Category selection
+  bot.callbackQuery(/^plugin:category:(.+)$/, async (ctx: MyContext) => {
+    const categorySlug = ctx.match?.[1];
+    if (!categorySlug) return;
+
+    const category = PLUGIN_CATEGORIES.find((c) => c.slug === categorySlug);
+    if (!category) return;
+
+    ctx.session.selectedCategory = categorySlug;
+    ctx.session.pluginPage = 1;
+
+    await ctx.answerCallbackQuery({ text: '⏳ در حال بارگذاری...' });
+
+    try {
+      const data = await listItems({
+        type: 'plugin',
+        category: categorySlug,
+        page: 1,
+        limit: 10
+      });
+
+      if (data.items.length === 0) {
+        await ctx.editMessageText(
+          '━━━━━━━━━━━━━━\n📂 <b>' +
+            category.name +
+            '</b>\n━━━━━━━━━━━━━━\n\n' +
+            'هیچ افزونه‌ای در این دسته‌بندی یافت نشد.',
+          { parse_mode: 'HTML', reply_markup: pluginCategoryKeyboard(PLUGIN_CATEGORIES) }
+        );
+        return;
+      }
+
+      await ctx.editMessageText(
+        '━━━━━━━━━━━━━━\n📂 <b>' +
+          category.name +
+          '</b>\n━━━━━━━━━━━━━━\n\n' +
+          'تعداد: ' +
+          data.items.length +
+          ' افزونه\n\n' +
+          'یک افزونه را انتخاب کنید:',
+        {
+          parse_mode: 'HTML',
+          reply_markup: pluginListKeyboard(data.items, 1)
+        }
+      );
+    } catch (e) {
+      console.error('[plugin_category] Error:', e);
+      await ctx.answerCallbackQuery({ text: '❌ خطا در دریافت لیست' });
+    }
+  });
+
+  // View plugin details
+  bot.callbackQuery(/^plugin:view:(\d+)$/, async (ctx: MyContext) => {
+    const id = parseInt(ctx.match?.[1] || '0');
+    if (!id) return;
+
+    await ctx.answerCallbackQuery({ text: '⏳ در حال بارگذاری...' });
+
+    try {
+      const item = await getItem(id);
+
+      const text = [
+        '━━━━━━━━━━━━━━',
+        '📦 <b>' + item.title + '</b>',
+        '━━━━━━━━━━━━━━',
+        '',
+        '🆔 شناسه: ' + item.id,
+        '🏷️ دسته: ' + item.category_name,
+        '📌 نسخه: ' + item.version,
+        '📊 حجم: ' + item.file_size,
+        '🌍 نسخه: ' + (item.variant === 'fa' ? 'فارسی' : 'انگلیسی'),
+        '📅 تاریخ: ' + item.publish_date,
+        '',
+        '📝 توضیحات:',
+        item.short_description || 'بدون توضیحات',
+        '',
+        '━━━━━━━━━━━━━━'
+      ].join('\n');
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'HTML',
+        reply_markup: pluginDetailKeyboard(id)
+      });
+    } catch (e) {
+      console.error('[plugin_view] Error:', e);
+      await ctx.answerCallbackQuery({ text: '❌ افزونه یافت نشد' });
+    }
+  });
+
+  // Download plugin
+  bot.callbackQuery(/^plugin:download:(\d+)$/, async (ctx: MyContext) => {
+    const id = parseInt(ctx.match?.[1] || '0');
+    if (!id) return;
+
+    await ctx.answerCallbackQuery({ text: '⏳ در حال دانلود...' });
+
+    try {
+      const result = await downloadFile(id);
+
+      if (!result) {
+        await ctx.reply('❌ خطا در دانلود فایل. ممکن است لینک خراب باشد.', {
+          reply_markup: mainMenuKeyboard()
+        });
+        return;
+      }
+
+      // Check file size (Telegram limit: 20MB for bots)
+      const fileSizeMB = result.buffer.length / (1024 * 1024);
+      if (fileSizeMB > 20) {
+        await ctx.reply(
+          '⚠️ <b>فایل خیلی بزرگ است</b>\n\n' +
+            'حجم فایل: ' +
+            fileSizeMB.toFixed(1) +
+            ' MB\n' +
+            'حد مجاز تلگرام: 20 MB\n\n' +
+            'لطفاً از سایت اصلی دانلود کنید.',
+          { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() }
+        );
+        return;
+      }
+
+      // Send file as document
+      await ctx.replyWithDocument(new InputFile(result.buffer, result.filename), {
+        caption: '✅ <b>' + result.filename + '</b>\n\nبا موفقیت دانلود شد!',
+        parse_mode: 'HTML'
+      });
+    } catch (e) {
+      console.error('[plugin_download] Error:', e);
+      await ctx.reply('❌ خطا در دانلود فایل', {
+        reply_markup: mainMenuKeyboard()
+      });
+    }
+  });
+
+  // Back to categories
+  bot.callbackQuery('plugin:categories', async (ctx: MyContext) => {
+    ctx.session.selectedCategory = undefined;
+    ctx.session.pluginPage = 1;
+
+    await ctx.editMessageText(
+      '━━━━━━━━━━━━━━\n📦 <b>دانلود افزونه</b>\n━━━━━━━━━━━━━━\n\n' + 'دسته‌بندی مورد نظر را انتخاب کنید:',
+      {
+        parse_mode: 'HTML',
+        reply_markup: pluginCategoryKeyboard(PLUGIN_CATEGORIES)
+      }
+    );
+    await ctx.answerCallbackQuery();
+  });
+
+  // Back to list
+  bot.callbackQuery('plugin:backtolist', async (ctx: MyContext) => {
+    const categorySlug = ctx.session.selectedCategory;
+    const page = ctx.session.pluginPage || 1;
+
+    if (!categorySlug) {
+      await ctx.editMessageText(
+        '━━━━━━━━━━━━━━\n📦 <b>دانلود افزونه</b>\n━━━━━━━━━━━━━━\n\n' + 'دسته‌بندی مورد نظر را انتخاب کنید:',
+        {
+          parse_mode: 'HTML',
+          reply_markup: pluginCategoryKeyboard(PLUGIN_CATEGORIES)
+        }
+      );
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const category = PLUGIN_CATEGORIES.find((c) => c.slug === categorySlug);
+
+    try {
+      const data = await listItems({
+        type: 'plugin',
+        category: categorySlug,
+        page: page,
+        limit: 10
+      });
+
+      await ctx.editMessageText(
+        '━━━━━━━━━━━━━━\n📂 <b>' +
+          (category?.name || '') +
+          '</b>\n━━━━━━━━━━━━━━\n\n' +
+          'صفحه: ' +
+          page +
+          '\n\n' +
+          'یک افزونه را انتخاب کنید:',
+        {
+          parse_mode: 'HTML',
+          reply_markup: pluginListKeyboard(data.items, page)
+        }
+      );
+      await ctx.answerCallbackQuery();
+    } catch (e) {
+      await ctx.answerCallbackQuery({ text: '❌ خطا' });
+    }
+  });
+
+  // Pagination
+  bot.callbackQuery(/^plugin:page:(\d+)$/, async (ctx: MyContext) => {
+    const page = parseInt(ctx.match?.[1] || '1');
+    const categorySlug = ctx.session.selectedCategory;
+
+    if (!categorySlug) {
+      await ctx.answerCallbackQuery({ text: '❌ دسته‌بندی انتخاب نشده' });
+      return;
+    }
+
+    const category = PLUGIN_CATEGORIES.find((c) => c.slug === categorySlug);
+    ctx.session.pluginPage = page;
+
+    await ctx.answerCallbackQuery({ text: '⏳ در حال بارگذاری صفحه ' + page + '...' });
+
+    try {
+      const data = await listItems({
+        type: 'plugin',
+        category: categorySlug,
+        page: page,
+        limit: 10
+      });
+
+      await ctx.editMessageText(
+        '━━━━━━━━━━━━━━\n📂 <b>' +
+          (category?.name || '') +
+          '</b>\n━━━━━━━━━━━━━━\n\n' +
+          'صفحه: ' +
+          page +
+          '\n\n' +
+          'یک افزونه را انتخاب کنید:',
+        {
+          parse_mode: 'HTML',
+          reply_markup: pluginListKeyboard(data.items, page)
+        }
+      );
+    } catch (e) {
+      await ctx.answerCallbackQuery({ text: '❌ خطا در بارگذاری' });
+    }
   });
 
   bot.callbackQuery(MENU.WATCH, async (ctx: MyContext) => {

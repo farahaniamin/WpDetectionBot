@@ -3,6 +3,7 @@ import { InlineKeyboard } from 'grammy';
 export const MENU = {
   ANALYZE: 'menu:analyze',
   SEO_AUDIT: 'menu:seo_audit',
+  PLUGIN_DOWNLOAD: 'menu:plugin_download',
   WATCH: 'menu:watch',
   RECENT: 'menu:recent',
   SETTINGS: 'menu:settings',
@@ -21,6 +22,8 @@ export function mainMenuKeyboard() {
     .text('🔍 بررسی سایت', MENU.ANALYZE)
     .row()
     .text('📊 SEO Audit', MENU.SEO_AUDIT)
+    .row()
+    .text('📦 دانلود افزونه', MENU.PLUGIN_DOWNLOAD)
     .row()
     .text('👁️ مانیتورینگ', MENU.WATCH)
     .row()
@@ -90,4 +93,54 @@ export function seoReportKeyboard(auditId: string, pdfUrl: string, isLocal: bool
   kb.text('⬅️ بازگشت به منو', MENU.BACK);
 
   return kb;
+}
+
+// Pluginyab Scraper keyboards
+export interface PluginCategory {
+  slug: string;
+  name: string;
+}
+
+export function pluginCategoryKeyboard(categories: PluginCategory[]) {
+  const kb = new InlineKeyboard();
+  for (const cat of categories) {
+    kb.text('📂 ' + cat.name, 'plugin:category:' + cat.slug).row();
+  }
+  kb.text('🔍 جستجو با نام', 'plugin:search').row();
+  kb.text('⬅️ بازگشت به منو', MENU.BACK);
+  return kb;
+}
+
+export function pluginListKeyboard(
+  plugins: { id: number; title: string; version: string }[],
+  page: number = 1
+) {
+  const kb = new InlineKeyboard();
+  for (const plugin of plugins) {
+    kb.text('📦 ' + plugin.title + ' v' + plugin.version, 'plugin:view:' + plugin.id).row();
+  }
+
+  // Pagination buttons
+  if (page > 1) {
+    kb.text('◀️ صفحه قبل', 'plugin:page:' + (page - 1));
+  }
+  kb.text('▶️ صفحه بعد', 'plugin:page:' + (page + 1));
+  kb.row();
+
+  kb.text('🔙 بازگشت به دسته‌بندی‌ها', 'plugin:categories').row();
+  kb.text('🏠 منوی اصلی', MENU.BACK);
+  return kb;
+}
+
+export function pluginDetailKeyboard(pluginId: number) {
+  return new InlineKeyboard()
+    .text('⬇️ دانلود افزونه', 'plugin:download:' + pluginId)
+    .row()
+    .text('🔙 بازگشت به لیست', 'plugin:backtolist')
+    .row()
+    .text('🏠 منوی اصلی', MENU.BACK);
+}
+
+export function pluginSearchKeyboard() {
+  return new InlineKeyboard().text('✖️ انصراف', MENU.CANCEL);
 }
