@@ -2,6 +2,7 @@ import { InlineKeyboard } from 'grammy';
 
 export const MENU = {
   ANALYZE: 'menu:analyze',
+  SEO_AUDIT: 'menu:seo_audit',
   WATCH: 'menu:watch',
   RECENT: 'menu:recent',
   SETTINGS: 'menu:settings',
@@ -18,6 +19,8 @@ function cleanSiteName(url: string): string {
 export function mainMenuKeyboard() {
   return new InlineKeyboard()
     .text('🔍 بررسی سایت', MENU.ANALYZE)
+    .row()
+    .text('📊 SEO Audit', MENU.SEO_AUDIT)
     .row()
     .text('👁️ مانیتورینگ', MENU.WATCH)
     .row()
@@ -69,4 +72,17 @@ export function watchManageKeyboard(siteOrigin: string) {
   kb.text('⏹️ توقف مانیتورینگ', `watch:stop:${siteOrigin}`).row();
   kb.text('⬅️ بازگشت', MENU.MY_WATCHES);
   return kb;
+}
+
+export function seoProgressKeyboard(auditId: string) {
+  return new InlineKeyboard().text('⏳ در حال بررسی...', `seo:noop:${auditId}`);
+}
+
+export function seoReportKeyboard(auditId: string, pdfUrl: string) {
+  return new InlineKeyboard()
+    .url('📄 دانلود PDF', pdfUrl)
+    .row()
+    .text('🔄 بررسی دوباره', `seo:retry:${auditId}`)
+    .row()
+    .text('⬅️ بازگشت به منو', MENU.BACK);
 }

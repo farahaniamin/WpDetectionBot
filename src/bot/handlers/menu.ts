@@ -17,6 +17,19 @@ import { guardAndNormalizeUrl } from '../../services/urlGuard.js';
 import { analyzeSite } from '../../services/siteAnalyzer.js';
 import { upsertWatch, deleteWatch as dbDeleteWatch } from '../../db/repos.js';
 import { createAnalyzeRunner, type AnalyzeRunner } from './analyze.js';
+import {
+  createSeoAudit,
+  pollForCompletion,
+  getPdfUrl,
+  formatStageLabel,
+  type SeoReport
+} from '../../services/seoAuditApi.js';
+import {
+  formatSeoReport,
+  formatSeoProgress,
+  formatSeoError
+} from '../../ui/formatters/seoReportFormatter.js';
+import { seoProgressKeyboard, seoReportKeyboard } from '../../ui/keyboards.js';
 
 function cleanSiteName(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\.+$/, '');
@@ -31,6 +44,7 @@ function helpText() {
     '📋 <b>دستورات:</b>',
     '',
     '• /analyze [url]  ← بررسی سایت',
+    '• /seo [url]     ← SEO Audit',
     '• /watch [url]   ← اضافه کردن به مانیتورینگ',
     '• /mywatches     ← لیست سایت‌های من',
     '• /recent [روز] ← آسیب‌پذیری‌های اخیر',
@@ -63,6 +77,19 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
     ctx.session.flow = 'awaiting_analyze_url';
     await ctx.editMessageText(
       '━━━━━━━━━━━━━━\n🔍 <b>بررسی سایت</b>\n━━━━━━━━━━━━━━\n\nآدرس سایت رو بفرست:\n<code>https://example.com</code>\n\nمی‌تونم اینارو تشخیص بدم:\n• ⚡ نسخه وردپرس\n• 🎨 قالب سایت\n• 📦 افزونه‌ها\n• 🛡️ وضعیت امنیتی\n• 🔴 آسیب‌پذیری‌ها',
+      {
+        parse_mode: 'HTML',
+        reply_markup: cancelKeyboard(),
+        link_preview_options: { is_disabled: true }
+      }
+    );
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(MENU.SEO_AUDIT, async (ctx: MyContext) => {
+    ctx.session.flow = 'awaiting_seo_url';
+    await ctx.editMessageText(
+      '━━━━━━━━━━━━━━\n📊 <b>SEO Audit</b>\n━━━━━━━━━━━━━━\n\nآدرس سایت رو بفرست تا بررسی کنم:\n<code>https://example.com</code>\n\n✨ <b>چی بررسی میشه:</b>\n• 🎯 Indexability (ایندکس‌پذیری)\n• 🕷️ Crawlability (خزش‌پذیری)\n• 📝 On-Page SEO\n• ⚙️ Technical SEO\n• 🔄 Content Freshness\n\n⏱️ حدود <b>۲-۳ دقیقه</b> زمان می‌بره\n━━━━━━━━━━━━━━',
       {
         parse_mode: 'HTML',
         reply_markup: cancelKeyboard(),
@@ -240,6 +267,68 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
       return;
     }
 
+    if (ctx.session.flow === 'awaiting_seo_url') {
+      ctx.session.flow = 'idle';
+      const url = text.trim();
+
+      // Validate URL
+      if (!url.match(/^https?:\/\//i)) {
+        await ctx.reply('❌ آدرس نامعتبر است. URL باید با http:// یا https:// شروع شود.', {
+          reply_markup: mainMenuKeyboard()
+        });
+        return;
+      }
+
+      // Send initial progress message
+      const progressMsg = await ctx.reply(
+        '━━━━━━━━━━━━━━\n' +
+          '⏳ <b>شروع SEO Audit...</b>\n' +
+          '━━━━━━━━━━━━━━\n\n' +
+          '📡 در حال ارسال درخواست...\n' +
+          '━━━━━━━━━━━━━━',
+        { parse_mode: 'HTML' }
+      );
+
+      try {
+        // Create audit
+        const audit = await createSeoAudit(url, 'smart');
+
+        // Poll for completion with progress updates
+        const report = await pollForCompletion(audit.audit_id, async (stage, value) => {
+          // Update message every progress change
+          try {
+            await ctx.api.editMessageText(
+              ctx.chat!.id,
+              progressMsg.message_id,
+              formatSeoProgress(stage, value),
+              { parse_mode: 'HTML' }
+            );
+          } catch (e) {
+            // Ignore edit errors (e.g., message not changed)
+          }
+        });
+
+        if (report) {
+          // Format and send report
+          const reportText = formatSeoReport(report);
+          const pdfUrl = getPdfUrl(audit.audit_id, 'fa');
+
+          await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, reportText, {
+            parse_mode: 'HTML',
+            reply_markup: seoReportKeyboard(audit.audit_id, pdfUrl),
+            link_preview_options: { is_disabled: true }
+          });
+        }
+      } catch (error: any) {
+        const errorMessage = error.message || 'Unknown error';
+        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, formatSeoError(errorMessage), {
+          parse_mode: 'HTML',
+          reply_markup: mainMenuKeyboard()
+        });
+      }
+      return;
+    }
+
     if (ctx.session.flow === 'awaiting_watch_url') {
       ctx.session.flow = 'idle';
       await handleWatchFromText(ctx, deps, text);
@@ -252,6 +341,63 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
   });
 
   // Keep original commands working
+  bot.command('seo', async (ctx: MyContext) => {
+    const input = ctx.match?.toString().trim();
+    if (!input) {
+      await ctx.reply('مثال: /seo https://example.com', { reply_markup: mainMenuKeyboard() });
+      return;
+    }
+
+    // Simulate the button click
+    ctx.session.flow = 'awaiting_seo_url';
+
+    // Send initial progress message
+    const progressMsg = await ctx.reply(
+      '━━━━━━━━━━━━━━\n' +
+        '⏳ <b>شروع SEO Audit...</b>\n' +
+        '━━━━━━━━━━━━━━\n\n' +
+        '📡 در حال ارسال درخواست...\n' +
+        '━━━━━━━━━━━━━━',
+      { parse_mode: 'HTML' }
+    );
+
+    try {
+      // Create audit
+      const audit = await createSeoAudit(input, 'smart');
+
+      // Poll for completion with progress updates
+      const report = await pollForCompletion(audit.audit_id, async (stage, value) => {
+        try {
+          await ctx.api.editMessageText(
+            ctx.chat!.id,
+            progressMsg.message_id,
+            formatSeoProgress(stage, value),
+            { parse_mode: 'HTML' }
+          );
+        } catch (e) {
+          // Ignore edit errors
+        }
+      });
+
+      if (report) {
+        const reportText = formatSeoReport(report);
+        const pdfUrl = getPdfUrl(audit.audit_id, 'fa');
+
+        await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, reportText, {
+          parse_mode: 'HTML',
+          reply_markup: seoReportKeyboard(audit.audit_id, pdfUrl),
+          link_preview_options: { is_disabled: true }
+        });
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, formatSeoError(errorMessage), {
+        parse_mode: 'HTML',
+        reply_markup: mainMenuKeyboard()
+      });
+    }
+  });
+
   bot.command('watch', async (ctx: MyContext) => {
     const input = ctx.match?.toString().trim();
     if (!input) {

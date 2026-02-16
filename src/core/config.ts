@@ -50,7 +50,11 @@ const schema = z.object({
     .default(360),
   WATCH_RECENT_DAYS: z.coerce.number().int().min(1).max(365).default(30),
 
-  ADMIN_USER_IDS: z.string().optional().default('')
+  ADMIN_USER_IDS: z.string().optional().default(''),
+
+  SEO_AUDIT_API_URL: z.string().url().default('http://localhost:8787'),
+  SEO_AUDIT_TIMEOUT_MS: z.coerce.number().int().min(60000).max(600000).default(300000),
+  SEO_AUDIT_POLL_INTERVAL_MS: z.coerce.number().int().min(1000).max(10000).default(2000)
 });
 
 export type AppConfig = z.infer<typeof schema> & { ADMIN_USER_ID_SET: Set<number> };
