@@ -21,6 +21,7 @@ import {
   createSeoAudit,
   pollForCompletion,
   getPdfUrl,
+  isLocalhostUrl,
   formatStageLabel,
   type SeoReport
 } from '../../services/seoAuditApi.js';
@@ -312,10 +313,11 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
           // Format and send report
           const reportText = formatSeoReport(report);
           const pdfUrl = getPdfUrl(audit.audit_id, 'fa');
+          const isLocal = isLocalhostUrl(pdfUrl);
 
           await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, reportText, {
             parse_mode: 'HTML',
-            reply_markup: seoReportKeyboard(audit.audit_id, pdfUrl),
+            reply_markup: seoReportKeyboard(audit.audit_id, pdfUrl, isLocal),
             link_preview_options: { is_disabled: true }
           });
         }
@@ -382,10 +384,11 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
       if (report) {
         const reportText = formatSeoReport(report);
         const pdfUrl = getPdfUrl(audit.audit_id, 'fa');
+        const isLocal = isLocalhostUrl(pdfUrl);
 
         await ctx.api.editMessageText(ctx.chat!.id, progressMsg.message_id, reportText, {
           parse_mode: 'HTML',
-          reply_markup: seoReportKeyboard(audit.audit_id, pdfUrl),
+          reply_markup: seoReportKeyboard(audit.audit_id, pdfUrl, isLocal),
           link_preview_options: { is_disabled: true }
         });
       }

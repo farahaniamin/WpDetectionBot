@@ -132,6 +132,20 @@ export function getPdfUrl(auditId: string, lang: 'fa' | 'en' = 'fa'): string {
   return `${SEO_AUDIT_API_URL}/v1/audits/${auditId}/report.pdf?lang=${lang}`;
 }
 
+export function isLocalhostUrl(url: string): boolean {
+  return url.includes('localhost') || url.includes('127.0.0.1') || url.includes('::1');
+}
+
+export async function downloadPdf(auditId: string, lang: 'fa' | 'en' = 'fa'): Promise<Buffer | null> {
+  try {
+    const response = await fetch(`${SEO_AUDIT_API_URL}/v1/audits/${auditId}/report.pdf?lang=${lang}`);
+    if (!response.ok) return null;
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
 export async function pollForCompletion(
   auditId: string,
   onProgress?: (stage: string, value: number) => void

@@ -78,11 +78,16 @@ export function seoProgressKeyboard(auditId: string) {
   return new InlineKeyboard().text('⏳ در حال بررسی...', `seo:noop:${auditId}`);
 }
 
-export function seoReportKeyboard(auditId: string, pdfUrl: string) {
-  return new InlineKeyboard()
-    .url('📄 دانلود PDF', pdfUrl)
-    .row()
-    .text('🔄 بررسی دوباره', `seo:retry:${auditId}`)
-    .row()
-    .text('⬅️ بازگشت به منو', MENU.BACK);
+export function seoReportKeyboard(auditId: string, pdfUrl: string, isLocal: boolean = false) {
+  const kb = new InlineKeyboard();
+
+  if (!isLocal) {
+    // Only show PDF button for non-localhost URLs
+    kb.url('📄 دانلود PDF', pdfUrl).row();
+  }
+
+  kb.text('🔄 بررسی دوباره', `seo:retry:${auditId}`).row();
+  kb.text('⬅️ بازگشت به منو', MENU.BACK);
+
+  return kb;
 }
