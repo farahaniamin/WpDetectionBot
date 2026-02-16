@@ -2,15 +2,25 @@ import type { Bot } from 'grammy';
 import type { Db } from '../../db/db.js';
 import type { AppConfig } from '../../core/config.js';
 import type { MyContext } from '../context.js';
-import { MENU, cancelKeyboard, mainMenuKeyboard } from '../../ui/keyboards.js';
+import {
+  MENU,
+  cancelKeyboard,
+  mainMenuKeyboard,
+  siteListKeyboard,
+  watchManageKeyboard
+} from '../../ui/keyboards.js';
 import { renderMenuText } from './settings.js';
 import { queryRecentVulns, insertEvent, listWatches, deleteWatch } from '../../db/repos.js';
 import type { VulnSeverity } from '../../core/types.js';
 import { formatRecentVulns } from '../../ui/formatters/reportFormatter.js';
 import { guardAndNormalizeUrl } from '../../services/urlGuard.js';
 import { analyzeSite } from '../../services/siteAnalyzer.js';
-import { upsertWatch } from '../../db/repos.js';
+import { upsertWatch, deleteWatch as dbDeleteWatch } from '../../db/repos.js';
 import { createAnalyzeRunner, type AnalyzeRunner } from './analyze.js';
+
+function cleanSiteName(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/\.+$/, '');
+}
 
 function helpText() {
   return [
@@ -93,29 +103,65 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
         await ctx.answerCallbackQuery();
         return;
       }
-      const lines = rows.map((r) => {
-        const theme = r.components.theme?.slug ? r.components.theme.slug : '-';
-        const plugins = r.components.plugins?.length || 0;
-        return `🔗 <code>${r.origin}</code>\n   └ 🎨 ${theme} • 📦 ${plugins} افزونه`;
-      });
       await ctx.editMessageText(
-        [
-          '━━━━━━━━━━━━━━',
-          '📁 <b>سایت‌های من</b>',
-          '━━━━━━━━━━━━━━',
-          '',
-          ...lines,
-          '',
-          '━━━━━━━━━━━━━━',
-          'برای حذف: /unwatch &lt;url&gt;'
-        ].join('\n'),
-        { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() }
+        '━━━━━━━━━━━━━━\n📁 <b>سایت‌های من</b>\n━━━━━━━━━━━━━━\n\nیکی از سایت‌ها رو انتخاب کن:',
+        { parse_mode: 'HTML', reply_markup: siteListKeyboard(rows) }
       );
       await ctx.answerCallbackQuery();
     } catch (e) {
       console.error('[my_watches] error:', e);
       await ctx.answerCallbackQuery({ text: 'خطا: ' + String(e) });
     }
+  });
+
+  bot.callbackQuery(/^watch:view:(.+)$/, async (ctx: MyContext) => {
+    const origin = ctx.match?.[1];
+    if (!origin) {
+      await ctx.answerCallbackQuery({ text: 'خطا: آدرس یافت نشد' });
+      return;
+    }
+    const rows = listWatches(deps.db, ctx.from!.id);
+    const site = rows.find((r) => r.origin === origin);
+    if (!site) {
+      await ctx.answerCallbackQuery({ text: 'سایت یافت نشد' });
+      return;
+    }
+    const theme = site.components.theme?.slug || 'نامشخص';
+    const plugins = site.components.plugins?.length || 0;
+    const text = `━━━━━━━━━━━━━━\n🔗 <b>${cleanSiteName(origin)}</b>\n━━━━━━━━━━━━━━\n\n🎨 <b>قالب:</b> ${theme}\n📦 <b>افزونه‌ها:</b> ${plugins}\n👁️ <b>وضعیت:</b> در حال مانیتورینگ\n\nیکی از گزینه‌ها رو انتخاب کن:`;
+    await ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      reply_markup: watchManageKeyboard(origin)
+    });
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(/^watch:delete:(.+)$/, async (ctx: MyContext) => {
+    const origin = ctx.match?.[1];
+    if (!origin) {
+      await ctx.answerCallbackQuery({ text: 'خطا: آدرس یافت نشد' });
+      return;
+    }
+    dbDeleteWatch(deps.db, ctx.from!.id, origin);
+    await ctx.editMessageText(
+      `━━━━━━━━━━━━━━\n✅ <b>حذف شد</b>\n━━━━━━━━━━━━━━\n\nسایت <b>${cleanSiteName(origin)}</b>\nاز لیست مانیتورینگ حذف شد.`,
+      { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() }
+    );
+    await ctx.answerCallbackQuery({ text: '🗑️ حذف شد' });
+  });
+
+  bot.callbackQuery(/^watch:stop:(.+)$/, async (ctx: MyContext) => {
+    const origin = ctx.match?.[1];
+    if (!origin) {
+      await ctx.answerCallbackQuery({ text: 'خطا: آدرس یافت نشد' });
+      return;
+    }
+    dbDeleteWatch(deps.db, ctx.from!.id, origin);
+    await ctx.editMessageText(
+      `━━━━━━━━━━━━━━\n⏹️ <b>مانیتورینگ متوقف شد</b>\n━━━━━━━━━━━━━━\n\nسایت <b>${cleanSiteName(origin)}</b>\nدیگر مانیتور نمی‌شه.\n\nبرای دوباره فعال کردن:\nاز دکمه 👁️ مانیتورینگ استفاده کن`,
+      { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() }
+    );
+    await ctx.answerCallbackQuery({ text: '⏹️ متوقف شد' });
   });
 
   bot.callbackQuery(MENU.RECENT, async (ctx: MyContext) => {
