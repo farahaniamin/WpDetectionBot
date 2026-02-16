@@ -1,10 +1,11 @@
 # WPInfo Telegram Bot - Technical Documentation
 
 **Project:** WPInfo Telegram Bot  
-**Version:** 2.0  
-**Last Updated:** February 16, 2026  
+**Version:** 2.1  
+**Last Updated:** February 17, 2026  
 **Author:** farahaniamin  
-**Repository:** https://github.com/farahaniamin/WpDetectionBot
+**Repository:** https://github.com/farahaniamin/WpDetectionBot  
+**Status:** Production Ready
 
 ---
 
@@ -28,6 +29,7 @@ WPInfo Telegram Bot is a comprehensive WordPress security and analysis tool deli
 - **Site Analysis** - Comprehensive WordPress stack detection (themes, plugins, versions)
 - **Proactive Alerts** - Real-time notifications for Critical/High severity vulnerabilities
 - **SEO Auditing** - Full SEO analysis with 5-pillar scoring system
+- **Plugin Downloads** - Browse and download 125+ plugins from 12 categories (v2.1+)
 - **Multi-site Management** - Watch and monitor multiple sites from Telegram
 - **Bilingual Support** - Full Persian (Farsi) interface with RTL support
 
@@ -41,7 +43,8 @@ WPInfo Telegram Bot is a comprehensive WordPress security and analysis tool deli
 - ✅ Monitor sites for security vulnerabilities automatically
 - ✅ Integrate with Wordfence vulnerability database
 - ✅ Provide real-time vulnerability notifications
-- ✅ Support SEO auditing via external Seo-Audit-API
+- ✅ Support SEO auditing via external Seo-Audit-API (v2.0)
+- ✅ Enable plugin downloads from external repository (v2.1)
 - ✅ Offer intuitive Persian-language Telegram interface
 - ✅ Store analysis history and user preferences
 - ✅ Handle high concurrent load with rate limiting
@@ -130,12 +133,13 @@ WPInfo Telegram Bot is a comprehensive WordPress security and analysis tool deli
 
 ### 4.2 External Integrations
 
-| Service              | Purpose                | Integration Type                         |
-| -------------------- | ---------------------- | ---------------------------------------- |
-| **Telegram Bot API** | User interface         | Long polling via Grammy                  |
-| **Wordfence API**    | Vulnerability database | REST API with API key                    |
-| **Seo-Audit-API**    | SEO analysis           | REST API (optional, local or remote)     |
-| **Target Websites**  | WordPress analysis     | HTTP scraping with respect to robots.txt |
+| Service               | Purpose                | Integration Type                         |
+| --------------------- | ---------------------- | ---------------------------------------- |
+| **Telegram Bot API**  | User interface         | Long polling via Grammy                  |
+| **Wordfence API**     | Vulnerability database | REST API with API key                    |
+| **Seo-Audit-API**     | SEO analysis           | REST API (optional, local or remote)     |
+| **Pluginyab-Scraper** | Plugin downloads       | REST API (optional, port 3001)           |
+| **Target Websites**   | WordPress analysis     | HTTP scraping with respect to robots.txt |
 
 ---
 
@@ -166,7 +170,8 @@ Single-process monolithic architecture with SQLite database. The bot runs as a s
 **Services (`src/services/`)**
 
 - `siteAnalyzer.ts` - Core WordPress analysis engine
-- `seoAuditApi.ts` - HTTP client for Seo-Audit-API
+- `seoAuditApi.ts` - HTTP client for Seo-Audit-API (v2.0)
+- `pluginyabApi.ts` - HTTP client for Pluginyab-Scraper (v2.1)
 - `wordfenceFeed.ts` - Wordfence vulnerability sync
 - `watchService.ts` - Watch notification system
 - `urlGuard.ts` - URL validation and normalization
@@ -805,6 +810,7 @@ Tracked in `events` table:
 | `ADMIN_USER_IDS`              | No       | -                          | Comma-separated admin IDs          |
 | `SEO_AUDIT_API_URL`           | No       | `http://localhost:8787`    | Seo-Audit-API endpoint             |
 | `SEO_AUDIT_TIMEOUT_MS`        | No       | `300000`                   | SEO audit timeout (5 min)          |
+| `PLUGINYAB_API_URL`           | No       | `http://localhost:3001`    | Plugin download service endpoint   |
 
 ### 12.2 Feature Flags
 
@@ -1091,7 +1097,49 @@ SQLite schema auto-created on startup. For changes:
 
 ---
 
-## 20. Missing Info / Questions
+## 20. Changelog
+
+### v2.1 (February 17, 2026)
+
+- **NEW**: Plugin Download feature - Browse and download 125+ plugins from 12 categories
+- **NEW**: Integration with Pluginyab-Scraper service (port 3001)
+- **NEW**: Persian plugin repository with categories: کاربردی, افزودنی المنتور, فرم ساز, امنیتی, فروشگاهی, سئو, پروفایل, چند زبانه, پشتیبان گیر, صفحه ساز, اسلایدر, همه افزونه‌ها
+- **NEW**: Direct file download via Telegram API with size validation (20MB limit)
+- **NEW**: Service health checks and improved error handling
+- **NEW**: Debug logging throughout plugin flow
+- **IMPROVED**: Category slug matching using exact database values
+- **IMPROVED**: Better error messages with Persian language support
+- **FIXED**: Accept 'degraded' service status (not just 'ok')
+- **FIXED**: 10-second timeout on API calls to prevent hanging
+
+### v2.0 (February 16, 2026)
+
+- **NEW**: SEO Audit integration with 5-pillar scoring system
+- **NEW**: Real-time progress tracking with visual indicators (▰▰▰▱▱▱▱▱▱▱)
+- **NEW**: PDF report generation and download support
+- **NEW**: WordPress REST API integration for content analysis
+- **NEW**: Content freshness scoring (newest/oldest content tracking)
+- **NEW**: Grade display system (A-F) with color-coded emojis
+- **NEW**: Smart mode (50 pages) and Full mode (120 pages) audit options
+- **NEW**: Persian language SEO reporting
+- **IMPROVED**: Enhanced UI/UX with better formatting
+- **IMPROVED**: Progress bars and stage indicators
+- **FIXED**: Localhost URL handling in Telegram buttons
+
+### v1.0 (Initial Release)
+
+- **NEW**: WordPress site analysis (themes, plugins, versions)
+- **NEW**: Security vulnerability detection via Wordfence integration
+- **NEW**: Watch system for automated notifications
+- **NEW**: SQLite database with caching
+- **NEW**: Admin commands for sync management
+- **NEW**: Persian (Farsi) interface with RTL support
+- **NEW**: Rate limiting and security features
+- **NEW**: Real-time progress indicators
+
+---
+
+## 21. Missing Info / Questions
 
 ### Essential Questions for Production
 
