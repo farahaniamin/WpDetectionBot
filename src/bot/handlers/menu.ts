@@ -120,8 +120,12 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
 
     try {
       // Check service health
+      console.log('[menu] Checking Pluginyab health...');
       const health = await getHealth();
-      if (health.status !== 'ok') {
+      console.log('[menu] Health check result:', health);
+
+      if (health.status === 'down') {
+        console.log('[menu] Service status down:', health.status);
         await ctx.editMessageText(
           '━━━━━━━━━━━━━━\n❌ <b>سرویس دانلود در دسترس نیست</b>\n━━━━━━━━━━━━━━\n\n' +
             'لطفاً بعداً تلاش کنید.',
@@ -131,10 +135,11 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
         return;
       }
 
+      console.log('[menu] Service OK, showing categories. Items:', health.items);
       await ctx.editMessageText(
         '━━━━━━━━━━━━━━\n📦 <b>دانلود افزونه</b>\n━━━━━━━━━━━━━━\n\n' +
           'تعداد افزونه‌های موجود: ' +
-          health.items +
+          (health.items || 0) +
           '\n\n' +
           'دسته‌بندی مورد نظر را انتخاب کنید:',
         {
@@ -143,13 +148,31 @@ export function registerMenu(bot: Bot<MyContext>, deps: { db: Db; cfg: AppConfig
         }
       );
       await ctx.answerCallbackQuery();
-    } catch (e) {
-      console.error('[plugin_download] Health check error:', e);
-      await ctx.editMessageText(
-        '━━━━━━━━━━━━━━\n❌ <b>خطا در اتصال به سرویس</b>\n━━━━━━━━━━━━━━\n\n' +
-          'لطفاً بررسی کنید که سرویس Pluginyab روی پورت 3001 در حال اجراست.',
-        { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() }
-      );
+    } catch (e: any) {
+      const errorMessage = e?.message || 'Unknown error';
+      console.error('[plugin_download] Health check error:', errorMessage);
+      console.error('[plugin_download] Full error:', e);
+
+      let userMessage = '━━━━━━━━━━━━━━\n❌ <b>خطا در اتصال به سرویس</b>\n━━━━━━━━━━━━━━\n\n';
+
+      if (errorMessage.includes('fetch failed') || errorMessage.includes('ECONNREFUSED')) {
+        userMessage += '⛔ اتصال به پورت 3001 برقرار نشد.\n\n';
+        userMessage += '✅ راه‌حل:\n';
+        userMessage += '1. بررسی کنید سرویس Pluginyab روی پورت 3001 اجراست\n';
+        userMessage += '2. دستور: <code>npm run dev</code> در پوشه Pluginyab-Scraper\n';
+        userMessage += '3. یا: <code>curl http://localhost:3001/health</code>';
+      } else if (errorMessage.includes('Invalid URL')) {
+        userMessage += '❌ آدرس API نامعتبر است.\n';
+        userMessage += 'بررسی کنید: PLUGINYAB_API_URL در فایل .env';
+      } else {
+        userMessage += '⚠️ خطا: ' + errorMessage + '\n\n';
+        userMessage += 'لطفاً بررسی کنید که سرویس Pluginyab روی پورت 3001 در حال اجراست.';
+      }
+
+      await ctx.editMessageText(userMessage, {
+        parse_mode: 'HTML',
+        reply_markup: mainMenuKeyboard()
+      });
       await ctx.answerCallbackQuery({ text: '❌ خطا در اتصال' });
     }
   });

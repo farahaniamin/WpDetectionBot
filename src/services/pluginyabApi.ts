@@ -33,15 +33,27 @@ export interface PluginyabHealth {
 }
 
 export async function getHealth(): Promise<PluginyabHealth> {
-  const response = await fetch(`${API_URL}/health`);
-  if (!response.ok) {
-    throw new Error(`Service unavailable: ${response.status}`);
+  console.log('[pluginyabApi] Checking health at:', `${API_URL}/health`);
+  try {
+    const response = await fetch(`${API_URL}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+    console.log('[pluginyabApi] Health response status:', response.status);
+    if (!response.ok) {
+      throw new Error(`Service unavailable: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log('[pluginyabApi] Health response data:', data);
+    return data;
+  } catch (e: any) {
+    console.error('[pluginyabApi] Health check failed:', e?.message || e);
+    throw e;
   }
-  return response.json();
 }
 
-export async function listItems(filters?: { 
-  type?: 'plugin' | 'theme'; 
+export async function listItems(filters?: {
+  type?: 'plugin' | 'theme';
   category?: string;
   page?: number;
   limit?: number;
@@ -51,10 +63,10 @@ export async function listItems(filters?: {
   if (filters?.category) params.set('category', filters.category);
   if (filters?.page) params.set('page', filters.page.toString());
   if (filters?.limit) params.set('limit', (filters.limit || 10).toString());
-  
+
   const queryString = params.toString();
   const url = `${API_URL}/items${queryString ? '?' + queryString : ''}`;
-  
+
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to fetch items: ${response.status}`);
@@ -82,11 +94,11 @@ export async function downloadFile(id: number): Promise<{ buffer: Buffer; filena
   try {
     const response = await fetch(`${API_URL}/download/${id}`);
     if (!response.ok) return null;
-    
+
     const contentDisposition = response.headers.get('content-disposition');
     const filename = contentDisposition?.match(/filename="([^"]+)"/)?.[1] || `plugin-${id}.zip`;
     const buffer = Buffer.from(await response.arrayBuffer());
-    
+
     return { buffer, filename };
   } catch (error) {
     console.error('[pluginyabApi] Download error:', error);
@@ -103,7 +115,7 @@ export const PLUGIN_CATEGORIES = [
   { slug: 'seo-plugins', name: 'سئو' },
   { slug: 'woocommerce', name: 'فروشگاهی' },
   { slug: 'multimedia', name: 'چندرسانه‌ای' },
-  { slug: 'backup', name: 'پشتیبان‌گیری' },
+  { slug: 'backup', name: 'پشتیبان‌گیری' }
 ];
 
 export async function searchPlugins(query: string): Promise<PluginyabItem[]> {
@@ -111,10 +123,11 @@ export async function searchPlugins(query: string): Promise<PluginyabItem[]> {
   // This is inefficient but the API doesn't have search endpoint
   const data = await listItems({ type: 'plugin', limit: 100 });
   const searchTerm = query.toLowerCase();
-  
-  return data.items.filter(item => 
-    item.title.toLowerCase().includes(searchTerm) ||
-    item.slug.toLowerCase().includes(searchTerm) ||
-    item.short_description?.toLowerCase().includes(searchTerm)
+
+  return data.items.filter(
+    (item) =>
+      item.title.toLowerCase().includes(searchTerm) ||
+      item.slug.toLowerCase().includes(searchTerm) ||
+      item.short_description?.toLowerCase().includes(searchTerm)
   );
 }
