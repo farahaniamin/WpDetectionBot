@@ -120,16 +120,20 @@ export async function downloadFile(id: number): Promise<{ buffer: Buffer; filena
   }
 }
 
-// Static categories list for faster UI
+// Static categories list for faster UI - Matching Pluginyab database
 export const PLUGIN_CATEGORIES = [
-  { slug: 'optimizer-plugins', name: 'سرعت و بهینه‌سازی' },
-  { slug: 'security-plugins', name: 'امنیت' },
-  { slug: 'form-plugins', name: 'فرم‌ساز' },
-  { slug: 'page-builder', name: 'صفحه‌ساز' },
-  { slug: 'seo-plugins', name: 'سئو' },
-  { slug: 'woocommerce', name: 'فروشگاهی' },
-  { slug: 'multimedia', name: 'چندرسانه‌ای' },
-  { slug: 'backup', name: 'پشتیبان‌گیری' }
+  { slug: 'کاربردی', name: '🔧 کاربردی' },
+  { slug: 'افزودنی المنتور', name: '✨ افزودنی المنتور' },
+  { slug: 'فرم ساز', name: '📝 فرم ساز' },
+  { slug: 'امنیتی', name: '🔒 امنیتی' },
+  { slug: 'فروشگاهی', name: '🛒 فروشگاهی' },
+  { slug: 'سئو', name: '📈 سئو' },
+  { slug: 'پروفایل', name: '👤 پروفایل' },
+  { slug: 'چند زبانه', name: '🌐 چند زبانه' },
+  { slug: 'پشتیبان گیر', name: '💾 پشتیبان گیر' },
+  { slug: 'صفحه ساز', name: '🎨 صفحه ساز' },
+  { slug: 'همه افزونه ها', name: '🔌 همه افزونه‌ها' },
+  { slug: 'اسلایدر', name: '🖼️ اسلایدر' }
 ];
 
 export async function searchPlugins(query: string): Promise<PluginyabItem[]> {
